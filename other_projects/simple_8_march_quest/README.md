@@ -1,0 +1,1 @@
+project for personal purposes, built on the basis of the Visual Novel Template
