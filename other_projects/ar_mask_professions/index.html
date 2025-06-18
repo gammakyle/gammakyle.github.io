@@ -8,15 +8,7 @@
   var prof_iterator = 0;
 
 
-    function enforceSize() {
-        document.body.style.width = '1080px';
-        document.body.style.height = '1920px';
-        window.scrollTo(0, 0);
-      }
-
-    // Применяем при загрузке и изменении размера
-    window.addEventListener('load', enforceSize);
-    window.addEventListener('resize', enforceSize);
+  
 
     document.addEventListener("DOMContentLoaded", function() {
     const professions = ["default", "tokar", "electro", "liteo", "itwork", "constructor", "technolog", "halvanic", "svarshik", "ispitatel"];
@@ -114,6 +106,7 @@
           
           <!--ассеты изображения -->
           <img id="default_img" src="./default/default.png" crossorigin="anonymous"/>
+          <img id="background" src="./default/background.png" crossorigin="anonymous"/>
           <img id="tokar_img" src="./tokar/tokar.png" crossorigin="anonymous"/>
           <img id="electro_img" src="./electro/electro.png" crossorigin="anonymous"/>
           <img id="liteo_img" src="./liteo/liteo.png" crossorigin="anonymous"/>
@@ -185,6 +178,16 @@
         <!--конец камера и голова-->
 
         <!--дефолт-->
+        <a-plane src="#background" position="-1.2 0 -1" width="2" height="2" rotation="0 0 0" material="transparent: true; alphaTest: 0.5;" visible="true">
+        </a-plane>
+        <a-plane src="#background" position="1.2 0 -1" width="2" height="2" rotation="0 0 0" material="transparent: true; alphaTest: 0.5;" visible="true">
+        </a-plane>
+        <a-plane src="#background" position="0 1.35 -1" width="2" height="2" rotation="0 0 0" material="transparent: true; alphaTest: 0.5;" visible="true">
+        </a-plane>
+        <a-plane src="#background" position="0 -1.35 -1" width="2" height="2" rotation="0 0 0" material="transparent: true; alphaTest: 0.5;" visible="true">
+        </a-plane>
+
+
         <a-plane src="#default_img" position="0 0 -1" width="0.42" height="0.75" rotation="0 0 0" material="transparent: true; alphaTest: 0.5;" visible="true" class="default-class">
         </a-plane>
         <!--конец дефолт-->
