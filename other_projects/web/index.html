@@ -1,29 +1,226 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>webrtc without signaling server demo</title>
-<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <title>WebRTC Lobby Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #lobby-controls, #chat-container { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        #messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        #lobby-list { margin: 10px 0; }
+        .lobby-item { padding: 5px; margin: 5px 0; background: #f5f5f5; }
+        button { padding: 5px 10px; margin: 5px; }
+    </style>
 </head>
-
 <body>
+    <h1>WebRTC Lobby System</h1>
+    
+    <div id="lobby-controls">
+        <h2>Create or Join Lobby</h2>
+        <input type="text" id="lobby-name" placeholder="Lobby name">
+        <button id="create-lobby">Create Lobby</button>
+        
+        <div id="lobby-list">
+            <h3>Available Lobbies:</h3>
+            <button id="refresh-lobbies">Refresh List</button>
+            <div id="lobbies-container"></div>
+        </div>
+    </div>
+    
+    <div id="chat-container" style="display: none;">
+        <h2>Chat: <span id="current-lobby-name"></span></h2>
+        <div id="messages"></div>
+        <input type="text" id="message-input" placeholder="Type your message">
+        <button id="send-message">Send</button>
+        <button id="leave-lobby">Leave Lobby</button>
+    </div>
 
-<h1>webrtc without signaling server demo.</h1>
-
-<p>
-a stun server is still required for connections over the internet.
-</p>
-
-<p>
-<a href="offering.html">offer a connection to a peer</a>
-</p>
-
-<p>
-<a href="answering.html">answer a connection offer from a peer</a>
-</p>
-
+    <script>
+        const API_URL = "https://gammakyle.pythonanywhere.com";
+        let peerId = null;
+        let lobbyId = null;
+        let peers = {};
+        let dataChannel = null;
+        
+        // Инициализация WebRTC
+        const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        
+        // Элементы DOM
+        const lobbyNameInput = document.getElementById('lobby-name');
+        const createLobbyBtn = document.getElementById('create-lobby');
+        const refreshLobbiesBtn = document.getElementById('refresh-lobbies');
+        const lobbiesContainer = document.getElementById('lobbies-container');
+        const chatContainer = document.getElementById('chat-container');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendMessageBtn = document.getElementById('send-message');
+        const leaveLobbyBtn = document.getElementById('leave-lobby');
+        const currentLobbyName = document.getElementById('current-lobby-name');
+        
+        // Создание лобби
+        createLobbyBtn.addEventListener('click', async () => {
+            const name = lobbyNameInput.value.trim();
+            if (!name) return alert('Please enter lobby name');
+            
+            try {
+                const response = await fetch(`${API_URL}/there`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    peerId = data.your_id;
+                    lobbyId = data.lobby_id;
+                    currentLobbyName.textContent = name;
+                    chatContainer.style.display = 'block';
+                    addMessage('System', 'You created this lobby. Waiting for others...');
+                    
+                    // Инициализируем WebRTC для создателя лобби
+                    initWebRTC(true);
+                }
+            } catch (error) {
+                console.error('Error creating lobby:', error);
+            }
+        });
+        
+        // Обновление списка лобби
+        refreshLobbiesBtn.addEventListener('click', refreshLobbies);
+        
+        async function refreshLobbies() {
+            try {
+                const response = await fetch(`${API_URL}/list_lobbies`);
+                const data = await response.json();
+                
+                lobbiesContainer.innerHTML = '';
+                data.lobbies.forEach(lobby => {
+                    const div = document.createElement('div');
+                    div.className = 'lobby-item';
+                    div.innerHTML = `
+                        ${lobby.name} (${lobby.users} user${lobby.users !== 1 ? 's' : ''})
+                        <button onclick="joinLobby('${lobby.id}', '${lobby.name}')">Join</button>
+                    `;
+                    lobbiesContainer.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error fetching lobbies:', error);
+            }
+        }
+        
+        // Присоединение к лобби
+        window.joinLobby = async (id, name) => {
+            try {
+                const response = await fetch(`${API_URL}/join_lobby`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lobby_id: id })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    peerId = data.your_id;
+                    lobbyId = data.lobby_id;
+                    currentLobbyName.textContent = name;
+                    chatContainer.style.display = 'block';
+                    addMessage('System', `You joined ${name}`);
+                    
+                    // Инициализируем WebRTC для участника
+                    initWebRTC(false, data.creator_ip);
+                }
+            } catch (error) {
+                console.error('Error joining lobby:', error);
+            }
+        };
+        
+        // Инициализация WebRTC
+        function initWebRTC(isCreator, creatorIp = null) {
+            const peerConnection = new RTCPeerConnection(configuration);
+            
+            if (isCreator) {
+                // Создатель лобби создает канал данных
+                dataChannel = peerConnection.createDataChannel('chat');
+                setupDataChannel(dataChannel);
+                
+                peerConnection.createOffer()
+                    .then(offer => peerConnection.setLocalDescription(offer))
+                    .then(() => {
+                        // В реальном приложении здесь нужно отправить offer другим участникам
+                        console.log('WebRTC offer created');
+                    });
+            } else {
+                // Участник ожидает канал данных
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel(dataChannel);
+                };
+                
+                // В реальном приложении здесь нужно получить offer от создателя
+                // и создать answer
+            }
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // В реальном приложении здесь нужно отправить кандидата другим участникам
+                    console.log('ICE candidate:', event.candidate);
+                }
+            };
+        }
+        
+        // Настройка канала данных
+        function setupDataChannel(channel) {
+            channel.onopen = () => {
+                addMessage('System', 'WebRTC connection established');
+            };
+            
+            channel.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addMessage(data.sender, data.message);
+            };
+        }
+        
+        // Отправка сообщения
+        sendMessageBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !dataChannel) return;
+            
+            const data = {
+                sender: `User-${peerId.slice(0, 4)}`,
+                message: message
+            };
+            
+            if (dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify(data));
+                addMessage(data.sender, data.message, true);
+                messageInput.value = '';
+            }
+        }
+        
+        // Выход из лобби
+        leaveLobbyBtn.addEventListener('click', () => {
+            chatContainer.style.display = 'none';
+            dataChannel = null;
+            peerId = null;
+            lobbyId = null;
+            messagesDiv.innerHTML = '';
+        });
+        
+        // Добавление сообщения в чат
+        function addMessage(sender, message, isMe = false) {
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <strong style="color: ${isMe ? 'blue' : 'black'}">${sender}:</strong> ${message}
+            `;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Инициализация
+        refreshLobbies();
+    </script>
 </body>
-
 </html>
