@@ -1,156 +1,29 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebTorrent Чат</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        #chat {
-            height: 300px;
-            border: 1px solid #ccc;
-            padding: 10px;
-            overflow-y: scroll;
-            margin-bottom: 10px;
-        }
-        #message {
-            width: 70%;
-            padding: 8px;
-        }
-        button {
-            padding: 8px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .info {
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>WebTorrent Чат</h1>
-    <div id="chat"></div>
-    <input type="text" id="message" placeholder="Введите сообщение...">
-    <button id="send">Отправить</button>
-    <div class="info">
-        Ваш ID: <span id="peer-id"></span><br>
-        Подключено: <span id="peers-count">0</span> участников
-    </div>
+<html>
 
-    <!-- Подключаем WebTorrent -->
-    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
-    
-    <script>
-        // Инициализация клиента WebTorrent
-        const client = new WebTorrent()
-        const chatRoom = 'webtorrent-chat-room-v1' // Уникальный идентификатор комнаты
-        
-        // Элементы интерфейса
-        const chatElement = document.getElementById('chat')
-        const messageInput = document.getElementById('message')
-        const sendButton = document.getElementById('send')
-        const peerIdElement = document.getElementById('peer-id')
-        const peersCountElement = document.getElementById('peers-count')
-        
-        // Генерируем случайный ID для пользователя
-        const peerId = Math.random().toString(36).substring(2, 15)
-        peerIdElement.textContent = peerId
-        
-        // Создаем торрент с нашим ID
-        const torrent = client.seed(Buffer.from(peerId), {
-            name: `${chatRoom}-${peerId}`,
-            announce: [
-                'wss://tracker.webtorrent.io',
-                'wss://tracker.openwebtorrent.com',
-                'wss://tracker.btorrent.xyz'
-            ]
-        })
-        
-        // Счетчик подключенных участников
-        let peersCount = 0
-        
-        // Обработчик отправки сообщения
-        sendButton.addEventListener('click', sendMessage)
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage()
-        })
-        
-        function sendMessage() {
-            const message = messageInput.value.trim()
-            if (!message) return
-            
-            // Добавляем свое сообщение в чат
-            addMessage(`Я (${peerId}): ${message}`)
-            
-            // Отправляем сообщение всем подключенным пирам
-            for (const peer of client.peers) {
-                try {
-                    peer.send(JSON.stringify({
-                        type: 'message',
-                        from: peerId,
-                        text: message,
-                        timestamp: Date.now()
-                    }))
-                } catch (e) {
-                    console.error('Ошибка отправки:', e)
-                }
-            }
-            
-            messageInput.value = ''
-        }
-        
-        // Добавление сообщения в чат
-        function addMessage(text) {
-            const messageElement = document.createElement('div')
-            messageElement.textContent = text
-            chatElement.appendChild(messageElement)
-            chatElement.scrollTop = chatElement.scrollHeight
-        }
-        
-        // Подключаемся к чат-комнате
-        client.add(chatRoom, {
-            announce: [
-                'wss://tracker.webtorrent.io',
-                'wss://tracker.openwebtorrent.com',
-                'wss://tracker.btorrent.xyz'
-            ]
-        }, (torrent) => {
-            // Обработка новых пиров
-            torrent.on('wire', (wire, addr) => {
-                peersCount++
-                peersCountElement.textContent = peersCount
-                
-                // Обработка входящих сообщений
-                wire.on('message', (message) => {
-                    try {
-                        const data = JSON.parse(message)
-                        if (data.type === 'message') {
-                            addMessage(`${data.from}: ${data.text}`)
-                        }
-                    } catch (e) {
-                        console.error('Ошибка разбора сообщения:', e)
-                    }
-                })
-            })
-            
-            torrent.on('peerClose', () => {
-                peersCount = Math.max(0, peersCount - 1)
-                peersCountElement.textContent = peersCount
-            })
-        })
-        
-        // Информационное сообщение
-        addMessage(`Добро пожаловать в чат! Ваш ID: ${peerId}`)
-        addMessage('Идет подключение к децентрализованной сети...')
-    </script>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>webrtc without signaling server demo</title>
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+</head>
+
+<body>
+
+<h1>webrtc without signaling server demo.</h1>
+
+<p>
+a stun server is still required for connections over the internet.
+</p>
+
+<p>
+<a href="offering.html">offer a connection to a peer</a>
+</p>
+
+<p>
+<a href="answering.html">answer a connection offer from a peer</a>
+</p>
+
 </body>
+
 </html>
